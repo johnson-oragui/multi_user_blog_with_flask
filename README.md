@@ -20,7 +20,7 @@ The Multi-User Blog Application is a web-based platform where users can register
 
 # Prerequisites
 
-- Python 3.10 or higher
+- Python 3.12 or higher
 - MySQL
 - Virtual Environment (optional but recommended)
 
@@ -28,7 +28,7 @@ The Multi-User Blog Application is a web-based platform where users can register
 
 1. # Clone the repository
   
-   git clone https://github.com/yourusername/multi-user-blog-application.git
+   git clone https://github.com/johnson-oragui/multi-user-blog-application.git
    cd multi-user-blog-application
 
 
@@ -66,44 +66,54 @@ The Multi-User Blog Application is a web-based platform where users can register
 
 
 multi-user-blog-application/
-│
-├── 
-│   ├── __init__.py
-│___models/
-│      ├── __init__.py
-│      ├── base_model.py
-│      ├── blog.py
-│      ├── comment.py
-│      ├── user.py
-│      ├── archived_blog.py
-│      ├── archived_comment.py
-│      ├── archived_user.py
-│      └── db_engine
-|          |_______ db_storage.py
-│___ templates/
-│      ├── base.html
-│      ├── index.html
-│      ├── dashboard.html
-│      └── delete_user.html
-│____ static/
-│      ├── css/
-│      └── js/
-│_____ views/
-│      ├── __init__.py
-│      ├── auth.py
-│      ├── dashboard.py
-│      └── users.py
-│      └── config.py
-├── tests/
-│   └── test_app.py
-|   |__ test_models
-|       |__________
-|       |__________test_db_engine
-|                  |________ test_db_storage.py
-├── .myvenv
-├── README.md
-├── requirements.txt
-└── app.py
+      configs
+            __init__.py
+            config.py
+      forms
+            __init__.py
+            blog_form.py
+            comment_form.py
+            login_form.py
+            register_form.py
+      models/
+            __init__.py
+            base_model.py
+            blog.py
+            comment.py
+            user.py
+            archived_blog.py
+            archived_comment.py
+            archived_user.py
+            db_engine/
+                  __init__.py
+                  db_storage.py
+      templates/
+             base.html
+             index.html
+             dashboard.html
+             delete_user.html
+      static/
+            css/
+            js/
+      views/
+            __init__.py
+            auth.py
+            dashboard.py
+            users.py
+            config.py
+      tests/
+            __init__.py
+            test_app.py
+            test_models
+            test_db_engine/
+                  __init__.py
+                  test_db_storage.py
+      __init__.py
+      .myvenv
+      README.md
+      requirements.txt
+      app.py
+      run.py
 
 
 # Usage
