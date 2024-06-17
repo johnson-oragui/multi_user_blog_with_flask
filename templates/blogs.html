@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <section>
+        
+        {% if blogs %}
+            <ul class="blogs">
+                {% for blog in blogs %}
+                    <a href="{{ url_for('dashboard.blog', user_id=user_id) }}"><li>Title: {{ blog.title }} Category: {{ blog.category }}</li></a>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </section>
+    
+    
+</body>
+</html>

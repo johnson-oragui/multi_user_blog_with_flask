@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <p>Dashboard</p>
+
+    <p>Delete account</p>
+    <a href="{{ url_for('dashboard.delete_user', user_id=user_id) }}" class="delete-account">delete account</a>
+
+    <h4>Add blog</h4>
+    <a href="{{ url_for('dashboard.add_blog', user_id=user_id) }}" class="add-blog">add blog</a>
+    
+</body>
+</html>

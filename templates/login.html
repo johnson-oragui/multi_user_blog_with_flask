@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        .errors {
+            list-style-type: none;
+            padding: 0;
+            color: red;
+        }
+        .error-message {
+            color: red;
+        }
+        .register {
+            color: black;
+        }
+    </style>
+</head>
+    <body>
+        {% from "_formhelpers.html" import render_field %}
+        <form method="post" action="{{ url_for('authenticate.login') }}">
+            {{ form.hidden_tag() }}
+            {{ render_field(form.username, class='register') }}
+            {{ render_field(form.password, class='register') }}
+
+            <input type="submit" value="login"/>
+        </form>
+</html>

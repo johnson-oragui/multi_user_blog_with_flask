@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form action="{{ url_for('dashboard.delete_comment', user_id=IDS.user_id, blog_id=IDS.blog_id, comment_id=IDS.comment_id) }}" method="post">
+        <label for="" class="delete-comment">
+            Are you sure to delete?
+            {{ form.hidden_tag() }}
+            <input type="hidden" name="_method" value="DELETE"/>
+            <input type="submit" value="delete"/>
+        </label>
+        
+    </form>
+    
+</body>
+</html>

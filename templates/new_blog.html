@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    {% from '_formhelpers.html' import render_field %}
+    <form action="{{ url_for('dashboard.add_blog', user_id=user_id) }}" method="post">
+        {{ form.hidden_tag() }}
+        {{ render_field(form.title) }}
+        {{ render_field(form.content) }}
+        {{ render_field(form.category) }}
+        {{ form.submit }}
+    </form>
+</body>
+</html>
