@@ -1,23 +1,21 @@
-from flask import Flask
-from views import dashboard, authenticate, comment
-
-app = Flask(__name__)
-
-app.url_map.strict_slashes = False
-
-app.register_blueprint(comment, url_prefix='/comments')
-app.register_blueprint(dashboard, url_prefix='/dashboard')
-app.register_blueprint(authenticate)
-
-@app.get('/')
-def index():
-    return f'INDEX'
+from flask import Flask, g
+from flask_wtf import CSRFProtect
+from configs.config import Config
+from views import views, dashboard, authenticate
 
 
-@app.route('/about')
-def about():
+def flask_app():
     
-    return f'<p>about page</p>'
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app = Flask(__name__)
+    app.config.from_object(Config)
+
+    csrf = CSRFProtect(app)
+
+    app.url_map.strict_slashes = False
+
+    app.register_blueprint(dashboard, url_prefix='/dashboard')
+    app.register_blueprint(authenticate)
+    app.register_blueprint(views)
+
+    return app
