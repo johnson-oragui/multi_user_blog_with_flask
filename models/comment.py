@@ -1,28 +1,27 @@
 from flask import g
 import logging
-from sqlalchemy import Column, String, ForeignKey, Boolean,Integer, event
-from sqlalchemy.orm import relationship
+from typing import List
+from sqlalchemy import String, ForeignKey,Integer, event
+from sqlalchemy.orm import Mapped, mapped_column
 from .base_model import Base, BaseModel
-from .archived_comment import ArchivedComment
 
 logger = logging.getLogger(__name__)
 
 
 class Comment(BaseModel, Base):
     __tablename__ = 'comments'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String(60), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    blog_id = Column(Integer, ForeignKey('blogs.id', ondelete='CASCADE'), nullable=False)
-    comment = Column(String(255))
-    user = relationship('User', back_populates='comments')
-    blog = relationship('Blog', back_populates='comments')
-    is_from_account_deletion = Column(Boolean, default=True)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(60), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    blog_id: Mapped[str] = mapped_column(Integer, ForeignKey('blogs.id', ondelete='CASCADE'), nullable=False)
+    comment: Mapped[str] = mapped_column(String(255))
 
 # Ensure the @event.listens_for decorator is placed outside the class
 # definition to correctly bind the event.
 @event.listens_for(Comment, 'before_delete')
 def archive_comment(mapper, connection, target):
     '''Archive comment before deletion'''
+    from .archived_comment import ArchivedComment
     try:
         flag_value = getattr(g, 'user_deletion')
         print('flag_value from comment: ', flag_value)
