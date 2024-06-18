@@ -2,11 +2,10 @@
 from os import getenv
 import dotenv
 import logging
-from datetime import datetime
-import bcrypt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm import scoped_session 
+from sqlalchemy.orm import scoped_session
+from sqlalchemy.sql import func
 from models.base_model import Base
 from models.user import User
 from models.blog import Blog
@@ -14,6 +13,7 @@ from models.comment import Comment
 from models.archived_comment import ArchivedComment
 from models.archived_user import ArchivedUser
 from models.archived_blog import ArchivedBlog
+from utils.auth_manager import AuthManager
 
 dotenv.load_dotenv()
 
@@ -32,30 +32,6 @@ CLASSES = {
     'ArchivedUser': ArchivedUser,
     'ArchivedBlog': ArchivedBlog
     }
-
-
-def hash_password(pwd):
-    """
-    Hashes a password using bcrypt.
-
-    Parameters:
-    pwd (str): The password to hash.
-
-    Returns:
-    str: The hashed password.
-    """
-    if not isinstance(pwd, str):
-        raise ValueError("Password must be a string")
-    if not pwd:
-        raise ValueError("Password cannot be empty")
-    
-    try:
-        encoded_pwd = pwd.encode()
-        hashed_pwd = bcrypt.hashpw(encoded_pwd, bcrypt.gensalt())
-        return hashed_pwd.decode()
-    except Exception as e:
-        raise ValueError(f"An error occurred while hashing the password: {e}")
-
 
 
 class DBStorage:
@@ -124,84 +100,121 @@ class DBStorage:
         except Exception as exc:
             logger.error('Error saving to table: ', exc)
     
-    def handle_user(self, user_dict: dict = None, user_id=None, edit=False, delete=False):
+    def handle_user_delete(self, user_id=None,  delete=False):
         session = self.session()
-        with session.begin():
             # for user deletion
-            try:
-                if user_id and delete and not user_dict and not edit:
-                    print('about to delete user')
+        try:
+            if user_id and delete:
+                print('about to delete user')
+                with session.begin():
                     user_to_delete: object = session.query(User).filter_by(id=user_id).one_or_none()
                     if user_to_delete:
                         session.delete(user_to_delete)
                         session.commit()
                         # print(f'user {user_to_delete} successfully deleted')
                         return self.to_dict(user_to_delete)
-            except Exception as exc:
-                logger.error(f'error deleting user {user_id}', exc)
+        except Exception as exc:
+            logger.error(f'error deleting user {user_id}', exc)
+            return
 
+    def handle_user_update(self, user_id=None, user_dict: dict = None, update=False,):
+        session = self.session()
         # for user update
         try:
-            with session.begin():
-                if edit and user_id and user_dict and not delete:
-                    if isinstance(user_id, str):
-                        if not all(hasattr(User, key) for key in user_dict.keys()):
-                            print(f'User dictionary contains invalid attributes')
-                            return
-                        user_dict['updated_at'] = datetime.now()
-                        user_to_update: int = session.query(User).filter_by(id=user_id).update(user_dict, synchronize_session='fetch')
-                        if not user_to_update:
-                            print(f'could not find user to update {user_dict}')
-                            return
-                        else:
-                            session.commit()
-                            # print(f'user_to_update: {user_to_update}')
-                            return user_to_update
-                    else:
-                        logger.info('Invalid user_id type, expected a string')
+            if isinstance(user_id, str):
+                if not all(hasattr(User, key) for key in user_dict.keys()):
+                    print(f'User dictionary contains invalid attributes')
+                    return
+                with session.begin():
+                    # user initiated update
+                    if user_id and user_dict and update:
+                        user_to_update: int = session.query(User).filter_by(id=user_id)
+                    # activate user after email confirmation
+                    elif user_dict and update and not user_id:
+                        user_to_update: int = session.query(User).filter_by(email=user_dict['email'],
+                                                                            reg_token=user_dict['reg_token'])
+                        # if user token is confirmed, set it to empty string
+                        user_dict['reg_token'] = ''
+                        # activate user by setting is_active to true
+                        user_dict['is_active'] = True
+                    if not user_to_update:
+                        print(f'could not find user to update {user_dict}')
                         return
+                    else:
+                        if not all(hasattr(User, key) for key in user_dict.keys()):
+                            print('user_dict contains invalid key(s), can not register user')
+                            return
+                        for key, value in user_dict.items():
+                            if hasattr(User, key):
+                                setattr(user_to_update, key, value)
+                        session.commit()
+                        # print(f'user_to_update: {user_to_update}')
+                        return self.to_dict(user_to_update)
+            else:
+                logger.info('Invalid user_id type, expected a string')
+                return
         except Exception as exc:
             logger.error(f'Error updating user: {exc}')
             return
 
+    def handle_user_insertion(self, user_dict=None, insert=False):
+        session = self.session()
         # for adding new user
         try:
-            with session.begin():
-                if not edit and not delete and not user_id and user_dict:
-                    if isinstance(user_dict, dict):
-                        if not all(hasattr(User, key) for key in user_dict.keys()):
-                            logger.info('User dictionary contains invalid attributes')
-                            return
+            if insert and user_dict:
+                if isinstance(user_dict, dict):
+                    if not all(hasattr(User, key) for key in user_dict.keys()):
+                        logger.info('User dictionary contains invalid attributes')
+                        return
+                    with session.begin():
                         user_email_exists = session.query(User).filter_by(email=user_dict['email']).one_or_none()
                         username_exists = session.query(User).filter_by(username=user_dict['username']).one_or_none()
                         if user_email_exists or username_exists:
-                            logger.info('username or user_email already exists')
+                            print('username or user_email already exists')
                             return
 
-                        hashed_pwd = hash_password(user_dict['password'])
+                        hashed_pwd = AuthManager.hash_password(user_dict['password'])
                         user_dict['password'] = hashed_pwd
                         new_user = User(**user_dict)
                         session.add(new_user)
                         session.commit()
                         print('new_user from dbstorage: ', self.to_dict(new_user))
                         return self.to_dict(new_user)
-                    else:
-                        logger.info('Invalid user_dict type, expected a dictionary')
-                        return
+                else:
+                    logger.info('Invalid user_dict type, expected a dictionary')
+                    return
         except Exception as exc:
             logger.error(f'Error adding new user: {exc}')
             return
-    
-    def handle_blog(self, user_id, blog_dict: dict = None, blog_id=None, delete=False, edit=False):
+        
+    def handle_user_login(self, user_dict=None, login=False):
         session = self.session()
-
-        with session.begin():
-            # blog deletion
-            if user_id and blog_id and delete and not blog_dict and not edit:
-                try:
-                    if not isinstance(blog_id, int):
-                        logger.info(f'blog with id {blog_id} not an integer')
+        # user login
+        if user_dict and login:
+            if not all([user_dict.get('username'), user_dict.get('password')]):
+                print(f'username or password missing')
+                return False
+            try:
+                with session.begin():
+                    found_user = session.query(User).filter_by(**user_dict).first()
+                    if found_user:
+                        return self.to_dict(found_user)
+                    else:
+                        print('username and password did not match any row')
                         return False
+            except Exception as exc:
+                logger.error(f'error finding user for login: {exc}')
+                return
+    
+    def handle_blog_delete(self, user_id, blog_id=None, delete=False):
+        session = self.session()
+        # blog deletion
+        try:
+            if user_id and blog_id and delete:
+                if not all([isinstance(user_id, str), isinstance(blog_id, int)]):
+                    logger.info(f'blog with id {blog_id} not an integer')
+                    return False
+                with session.begin():
                     blog_to_delete: object = session.query(Blog).filter_by(
                         user_id=user_id,
                         id=blog_id,
@@ -210,36 +223,43 @@ class DBStorage:
                         session.delete(blog_to_delete)
                         session.commit()
                         return self.to_dict(blog_to_delete)
-                except Exception as exc:
-                    logger.error(f'error deleting blog with id: {blog_id}: ', exc)
+        except Exception as exc:
+            logger.error(f'error deleting blog with id: {blog_id}: ', exc)
 
-        with session.begin():
+    def handle_blog_update(self, user_id, blog_id=None, blog_dict=None, update=False):
+        session = self.session()
+        try:
             # edit a blog
-            if user_id and blog_dict and blog_id and edit and not delete:
-                checks = [isinstance(user_id, str), isinstance(blog_dict, dict)]
-                if all(checks):
-                    blog_dict['updated_at'] = datetime.now()
-                    try:
-                        blog_to_update: int = session.query(Blog).filter_by(id=blog_id, user_id=user_id).update(blog_dict, synchronize_session='fetch')
-                        # print(f'blog: {blog_to_update}')
+            if user_id and blog_dict and blog_id and update:
+                if all([isinstance(user_id, str), isinstance(blog_dict, dict), isinstance(blog_id, int)]):
+                    with session.begin():
+                        blog_to_update: object = session.query(Blog).filter_by(id=blog_id, user_id=user_id)
+                        if blog_to_update:
+                            if not all(hasattr(Blog, key) for key in blog_dict.keys()):
+                                print(f'{key} is an invalid field')
+                                return
+                            for key, value in blog_dict.items(): 
+                                setattr(blog_to_update, key, value)
                         session.commit()
-                        return blog_to_update
-                    except Exception as exc:
-                        logger.error(f'error updating blog: {blog_dict}')
-                        return
+                        return self.to_dict(blog_to_update)
                 else:
                     logger.info('user_id or blog_id not a string')
                     return
-
-        with session.begin(): 
+        except Exception as exc:
+            logger.error(f'error updating blog: {exc}')
+            return
+            
+    def handle_blog_insertion(self, user_id, blog_dict=None, insert=False):
+        session = self.session() 
             # add new blog
-            if user_id and not delete and not edit and blog_dict and not blog_id:
-                if isinstance(user_id, str) and isinstance(blog_dict, dict):
-                    if not all(hasattr(Blog, key) for key in blog_dict.keys()):
-                        logger.info(f'{blog_dict} not an attr of blog')
-                        return
-                    try:
-                        logger.info(f'searching for user {user_id} to add new blog')
+        if user_id and blog_dict and insert:
+            if all([isinstance(user_id, str), isinstance(blog_dict, dict)]):
+                if not all(hasattr(Blog, key) for key in blog_dict.keys()):
+                    logger.info(f'{blog_dict} not an attr of blog')
+                    return
+                try:
+                    print(f'searching for user {user_id} to add new blog')
+                    with session.begin():
                         user = session.query(User).filter_by(id=user_id).one_or_none()
                         if user:
                             blog_dict['user_id'] = user_id
@@ -250,22 +270,23 @@ class DBStorage:
                             return self.to_dict(new_blog)
                         else:
                             logger.info(f'user with id {user_id} not found')
-                    except Exception as exc:
-                        logger.error(f'error add new blog {exc}')
-                        return
+                except Exception as exc:
+                    logger.error(f'error add new blog {exc}')
+                    return
                 else:
                     logger.info('user_id or blog_id not a string')
                     return
     
-    def handle_comment(self, user_id, blog_id=None, comment=None, comment_id=None, delete=False, edit=False):
+    def handle_comment_deletion(self, user_id, blog_id=None, comment_id=None, delete=False):
         session = self.session()
         # comment deletion
-        if user_id and blog_id and comment_id and delete and not comment and not edit:
+        if user_id and blog_id and comment_id and delete:
             try:
+                checks = [isinstance(user_id, str), isinstance(comment_id, int), isinstance(blog_id, int)]
+                if not all(checks):
+                    logger.info(f'{blog_id} or {comment_id} not an integer')
+                    return False
                 with session.begin():
-                    if not isinstance(blog_id, int) or not isinstance(comment_id, int):
-                        logger.info(f'{blog_id} or {comment_id} not an integer')
-                        return False
                     comment_to_delete: object = session.query(Comment).filter_by(
                         user_id=user_id,
                         blog_id=blog_id,
@@ -279,48 +300,56 @@ class DBStorage:
             except Exception as exc:
                 logger.error(f'error deleting comment with id: {comment_id}: ', exc)
 
+    def handle_comment_update(self, user_id, blog_id=None, comment=None, comment_id=None, edit=False):
+        session = self.session()
         # for comment updating
-        if edit and user_id and comment_id and blog_id and not delete:
+        if all[(edit, user_id, comment_id, blog_id, comment)]:
+            checks = [isinstance(user_id, str), isinstance(comment_id, int), isinstance(blog_id, int)]
+            if not all(checks):
+                return
             try:
                 with session.begin():
-                    comment_to_update: int = session.query(Comment).filter_by(id=comment_id, user_id=user_id, blog_id=blog_id).update(
-                        {'comment': comment, 'updated_at': datetime.now()},
-                        synchronize_session='fetch'
-                    )
+                    comment_to_update: int = session.query(Comment).filter_by(id=comment_id,
+                                                                              user_id=user_id,
+                                                                              blog_id=blog_id)
+                    comment_to_update.comment = comment
                     print(f'comment: {comment_to_update}')
                     session.commit()
-                    return comment_to_update
+                    return self.to_dict(comment_to_update)
             except Exception as exc:
                 logger.error('db.handle_comment: error editing comment: ', exc)
                 return
 
+    def handle_comment_insert(self, user_id, blog_id=None, comment=None):
+        session = self.session()
         # for comment insertion
-        if not edit and not delete and user_id and comment and blog_id:
-            checks = [isinstance(user_id, str), isinstance(blog_id, int)]
-            if not all(checks):
-                logger.info('user_id or comment not a string')
-                return
-            if comment.strip() == '':
-                logger.info('comment can not be empty')
-                return
-            try:
-                with session.begin():
-                    new_comment = Comment(comment=comment, user_id=user_id, blog_id=blog_id)
-                    session.add(new_comment)
-                    session.commit()
-                    return self.to_dict(new_comment)
-            except Exception as exc:
-                logger.error('db.handle_comment: error adding comment: ', exc)
-                return
-        else:
-            logger.info('no user_id or comment provided')
+        if not all([user_id, blog_id, comment]):
+            logger.info('user_id, blog_id, or comment not provided')
+            return
+        if not isinstance(user_id, str):
+            logger.info('user_id not a string')
+            return
+        if not isinstance(blog_id, int):
+            logger.info('blog_id must be an integer')
+            return
+        if not isinstance(comment, str) or comment.strip() == '':
+            logger.info('comment can not be empty')
+            return
+        try:
+            with session.begin():
+                new_comment = Comment(comment=comment, user_id=user_id, blog_id=blog_id)
+                session.add(new_comment)
+                session.commit()
+                return self.to_dict(new_comment)
+        except Exception as exc:
+            logger.error('db.handle_comment: error adding comment: ', exc)
             return
     
     def get_blogs(self, user_id, blog_id=None):
         session = self.session()
 
         # retrieve a single blog
-        if user_id and blog_id:
+        if all([user_id, blog_id]):
             try:
                 with session.begin():
                     blog = session.query(Blog).filter_by(id=blog_id, user_id=user_id).one_or_none()
@@ -384,6 +413,17 @@ class DBStorage:
                         return self.to_dict(list(all_blogs))
             except Exception as exc:
                 logger.error(f'error finding blog with user_id :{user_id}')
+    
+    def count_blogs_per_user(self, user_id):
+        session = self.session()
+
+        if user_id:
+            try:
+                with session.begin():
+                    number_of_blogs = session.query(User.id, func.count(Blog.id)).filter_by(id=user_id).join(Blog).group_by(User.id).all()
+                    return list(number_of_blogs) if number_of_blogs else []
+            except Exception as exc:
+                logger.error(f'error getting blogs per user: {exc}')
     
     def to_dict(self, obj):
         '''converts obj to list of dict or a dict
