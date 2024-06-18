@@ -1,26 +1,27 @@
 from flask import g
 import logging
-from sqlalchemy import Column, Boolean, Integer, String, ForeignKey, event
-from sqlalchemy.orm import relationship
+from typing import List
+from sqlalchemy import Integer, String, ForeignKey, event
+from sqlalchemy.orm import relationship, mapped_column, Mapped
 from .base_model import Base, BaseModel
-from .archived_blog import ArchivedBlog
+
 
 logger = logging.getLogger(__name__)
 
 class Blog(BaseModel, Base):
     __tablename__ = 'blogs'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String(60), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    title = Column(String(60), nullable=False)
-    content = Column(String(1000), nullable=False)
-    category = Column(String(60))
-    is_from_account_deletion = Column(Boolean, default=True)
-    user = relationship('User', back_populates='blogs')
-    comments = relationship('Comment', back_populates='blog', cascade='all, delete-orphan')
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(60), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    title: Mapped[str] = mapped_column(String(60), nullable=False)
+    content: Mapped[str] = mapped_column(String(1000), nullable=False)
+    category: Mapped[str] = mapped_column(String(60))
+
+    comments: Mapped[List['Comment']] = relationship('Comment', backref='blog', cascade='all, delete-orphan')
 
 def archive_blog(mapper, connection, target):
     '''Archive blog before deletion'''
+    from .archived_blog import ArchivedBlog
     try:
         flag_value = getattr(g, 'user_deletion')
         print('flag_value from blog: ', flag_value)
@@ -32,7 +33,7 @@ def archive_blog(mapper, connection, target):
     try:
         blog_to_archive = {
             'blog_id': target.id,
-            'user_id': target.id,
+            'user_id': target.user_id,
             'title': target.title,
             'content': target.content,
             'category': target.category,
