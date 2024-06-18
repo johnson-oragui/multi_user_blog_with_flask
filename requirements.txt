@@ -15,3 +15,5 @@ WTForms==3.1.2
 python-dotenv==1.0.1
 Flask-WTF==1.2.1
 Flask-Babel==1.0.0
+pyJWT=2.3.0
+secure-smtplib=0.1.1
